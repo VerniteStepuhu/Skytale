@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Scytale Шифрование</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px; /* Уменьшено */
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            display: flex;
+            gap: 24px; /* Уменьшено */
+        }
+        .panel {
+            flex: 1;
+            padding: 24px; /* Уменьшено */
+            border: 2px solid #ccc; /* Уменьшено */
+            border-radius: 8px; /* Уменьшено */
+            background-color: white;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1); /* Уменьшено */
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px; /* Уменьшено */
+            padding: 12px; /* Уменьшено */
+            background-color: white;
+            border-radius: 8px; /* Уменьшено */
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1); /* Уменьшено */
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px; /* Уменьшено */
+            font-size: 16px; /* Уменьшено */
+        }
+        input, textarea, button {
+            width: 100%;
+            margin: 12px 0; /* Уменьшено */
+            padding: 10px; /* Уменьшено */
+            border: 2px solid #ddd; /* Уменьшено */
+            border-radius: 6px; /* Уменьшено */
+            box-sizing: border-box;
+            font-size: 14px; /* Уменьшено */
+        }
+        textarea {
+            min-height: 120px; /* Уменьшено */
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 14px; /* Уменьшено */
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px; /* Уменьшено */
+        }
+        .logout-btn {
+            padding: 10px 20px; /* Уменьшено */
+            background-color: #dc3545;
+            width: auto;
+            font-size: 14px; /* Уменьшено */
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        #encryptResult, #decryptResult {
+            margin-top: 18px; /* Уменьшено */
+            padding: 12px; /* Уменьшено */
+            border-radius: 6px; /* Уменьшено */
+            background-color: #f8f8f8;
+            word-break: break-all;
+            font-size: 14px; /* Уменьшено */
+        }
+        h2 {
+            font-size: 24px; /* Уменьшено */
+        }
+        .loader {
+            display: none;
+            width: 48px; /* Уменьшено */
+            height: 48px; /* Уменьшено */
+            border: 6px solid #f3f3f3; /* Уменьшено */
+            border-radius: 50%;
+            border-top: 6px solid #4CAF50; /* Уменьшено */
+            animation: spin 1s linear infinite;
+            margin: 12px auto; /* Уменьшено */
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="user-info">
+            Пользователь: <span id="currentUser"></span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Выйти</button>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Шифрование</h2>
+            <textarea id="textToEncrypt" placeholder="Введите текст для шифрования"></textarea>
+            <input type="number" id="encryptKey" placeholder="Введите ключ (число)" min="1">
+            <button onclick="encrypt()">Зашифровать</button>
+            <div class="loader" id="encryptLoader"></div>
+            <div id="encryptResult"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Расшифрование</h2>
+            <textarea id="textToDecrypt" placeholder="Введите текст для расшифрования"></textarea>
+            <input type="number" id="decryptKey" placeholder="Введите ключ (число)" min="1">
+            <button onclick="decrypt()">Расшифровать</button>
+            <div class="loader" id="decryptLoader"></div>
+            <div id="decryptResult"></div>
+        </div>
+    </div>
+
+
+    <script>
+        // Проверка авторизации
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+        document.getElementById('currentUser').textContent = localStorage.getItem('username');
+
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            window.location.href = '/login.html';
+        }
+
+        async function encrypt() {
+            const text = document.getElementById('textToEncrypt').value;
+            const key = parseInt(document.getElementById('encryptKey').value);
+            const loader = document.getElementById('encryptLoader');
+            const result = document.getElementById('encryptResult');
+            
+            if (!text || !key || key <= 0) {
+                result.innerText = 'Заполните все поля корректно';
+                return;
+            }
+
+            try {
+                loader.style.display = 'block';
+                result.innerText = '';
+                
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const response = await fetch('/encrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ text, key })
+                });
+
+                if (response.status === 401) {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('username');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
+                const data = await response.json();
+                if (data.error) {
+                    result.style.color = '#dc3545';
+                    result.innerText = `Ошибка: ${data.error}`;
+                } else {
+                    result.style.color = '#4CAF50';
+                    result.innerText = `Зашифрованный текст: ${data.encryptedText}`;
+                    // Автоматически копируем результат в поле расшифрования
+                    document.getElementById('textToDecrypt').value = data.encryptedText;
+                    document.getElementById('decryptKey').value = key;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                result.style.color = '#dc3545';
+                result.innerText = `Ошибка: ${error.message}`;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        async function decrypt() {
+            const encryptedText = document.getElementById('textToDecrypt').value;
+            const key = parseInt(document.getElementById('decryptKey').value);
+            const loader = document.getElementById('decryptLoader');
+            const result = document.getElementById('decryptResult');
+            
+            if (!encryptedText || !key || key <= 0) {
+                result.innerText = 'Заполните все поля корректно';
+                return;
+            }
+
+            try {
+                loader.style.display = 'block';
+                result.innerText = '';
+
+                const response = await fetch('/decrypt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ encryptedText, key })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                if (data.error) {
+                    result.style.color = '#dc3545';
+                    result.innerText = `Ошибка: ${data.error}`;
+                    if (data.error.includes('авторизация')) {
+                        setTimeout(() => window.location.href = '/login.html', 1500);
+                    }
+                } else {
+                    result.style.color = '#4CAF50';
+                    result.innerText = `Расшифрованный текст: ${data.decryptedText}`;
+                }
+            } catch (error) {
+                result.style.color = '#dc3545';
+                result.innerText = `Ошибка: ${error.message}`;
+                console.error('Full error:', error);
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // Добавляем обработку Enter для полей ввода
+        document.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    if (this.closest('.panel').querySelector('h2').textContent.includes('Шифрование')) {
+                        encrypt();
+                    } else {
+                        decrypt();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
